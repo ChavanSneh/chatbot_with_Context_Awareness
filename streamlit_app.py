@@ -1,56 +1,64 @@
 import streamlit as st
-from openai import OpenAI
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
-# Show title and description.
-st.title("💬 Chatbot")
-st.write(
-    "This is a simple chatbot that uses OpenAI's GPT-3.5 model to generate responses. "
-    "To use this app, you need to provide an OpenAI API key, which you can get [here](https://platform.openai.com/account/api-keys). "
-    "You can also learn how to build this app step by step by [following our tutorial](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)."
+# Load your OpenRouter Key from .env
+load_dotenv()
+api_key = os.getenv("OPENROUTER_API_KEY") # Make sure this matches your .env file!
+or_url = "https://openrouter.ai/api/v1"
+
+st.set_page_config(page_title="Multi-Agent Chat", page_icon="🤖")
+st.title("The AI Squad 🤖🤖")
+
+# 1. Initialize Memory (The Shared State)
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = [
+        SystemMessage(content="You are a collaborative AI team.")
+    ]
+
+# 2. Define your Agents (The Specialists)
+# Agent 1: Fast & Logical (Llama 3)
+researcher = ChatOpenAI(
+    model="meta-llama/llama-3-8b-instruct",
+    openai_api_key=api_key,
+    openai_api_base=or_url
 )
 
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
-else:
+# Agent 2: Creative & Sophisticated (Claude 3.5 or GPT-4o)
+writer = ChatOpenAI(
+    model="anthropic/claude-3.5-sonnet", 
+    openai_api_key=api_key,
+    openai_api_base=or_url
+)
 
-    # Create an OpenAI client.
-    client = OpenAI(api_key=openai_api_key)
+# 3. Display Chat
+for message in st.session_state.chat_history:
+    if isinstance(message, (HumanMessage, AIMessage)):
+        role = "user" if isinstance(message, HumanMessage) else "assistant"
+        with st.chat_message(role):
+            st.markdown(message.content)
 
-    # Create a session state variable to store the chat messages. This ensures that the
-    # messages persist across reruns.
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+# 4. The Multi-Agent Workflow
+if user_query := st.chat_input("Ask your team..."):
+    st.session_state.chat_history.append(HumanMessage(content=user_query))
+    with st.chat_message("user"):
+        st.markdown(user_query)
 
-    # Display the existing chat messages via `st.chat_message`.
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    with st.chat_message("assistant"):
+        # Step A: Researcher Agent thinks first
+        with st.status("Researcher is thinking...", expanded=False):
+            # Pass full history for Context Awareness
+            research_notes = researcher.invoke(st.session_state.chat_history)
+            st.write("Done researching.")
 
-    # Create a chat input field to allow the user to enter a message. This will display
-    # automatically at the bottom of the page.
-    if prompt := st.chat_input("What is up?"):
-
-        # Store and display the current prompt.
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        # Generate a response using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            stream=True,
-        )
-
-        # Stream the response to the chat using `st.write_stream`, then store it in 
-        # session state.
-        with st.chat_message("assistant"):
-            response = st.write_stream(stream)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        # Step B: Writer Agent polishes the research
+        with st.status("Writer is crafting response...", expanded=False):
+            # We give the writer the research notes + history
+            final_response = writer.invoke(
+                st.session_state.chat_history + [AIMessage(content=f"Notes: {research_notes.content}")]
+            )
+        
+        st.markdown(final_response.content)
+        st.session_state.chat_history.append(AIMessage(content=final_response.content))
