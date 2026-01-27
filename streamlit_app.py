@@ -16,14 +16,14 @@ st.title("🤖 The AI Squad: Context-Aware Chat")
 # 2. Initialize the Agents (The Squad)
 # Note the commas and max_tokens=500 to keep within credit limits
 researcher = ChatOpenAI(
-    model="google/gemini-flash-1.5-exp:free",
+    model="meta-llama/llama-3.1-8b-instruct:free",
     openai_api_key=api_key,
     openai_api_base=or_url,
     max_tokens=500,
 )
 
 writer = ChatOpenAI(
-    model="google/gemini-flash-1.5-exp:free",
+    model="meta-llama/llama-3.1-8b-instruct:free",
     openai_api_key=api_key,
     openai_api_base=or_url,
     max_tokens=500,
