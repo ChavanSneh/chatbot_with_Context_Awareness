@@ -1,46 +1,20 @@
 import streamlit as st
 import os
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 # 1. Setup & Security
 load_dotenv()
-api_key = os.getenv("OPENROUTER_API_KEY")
-or_url = "https://openrouter.ai/api/v1"
+api_key = os.getenv("GOOGLE_API_KEY")
 
-# Page Config
-st.set_page_config(page_title="The AI Squad", layout="wide")
-st.title("🤖 The AI Squad: Context-Aware Chat")
+# 2. Initialize the Agents
+researcher = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
+writer = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
 
-# 2. Initialize the Agents (The Squad)
-# Note the commas and max_tokens=500 to keep within credit limits
-researcher = ChatOpenAI(
-    model="meta-llama/llama-3.1-8b-instruct:free",
-    openai_api_key=api_key,
-    openai_api_base=or_url,
-    max_tokens=500,
-)
-
-writer = ChatOpenAI(
-    model="meta-llama/llama-3.1-8b-instruct:free",
-    openai_api_key=api_key,
-    openai_api_base=or_url,
-    max_tokens=500,
-)
-
-# 3. Initialize Memory (Context Awareness)
+# 3. Initialize Memory
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-
-# Display previous chat messages
-for message in st.session_state.chat_history:
-    if isinstance(message, HumanMessage):
-        with st.chat_message("user"):
-            st.markdown(message.content)
-    elif isinstance(message, AIMessage):
-        with st.chat_message("assistant"):
-            st.markdown(message.content)
 
 # 4. Chat Logic
 if user_input := st.chat_input("Ask your squad anything..."):
