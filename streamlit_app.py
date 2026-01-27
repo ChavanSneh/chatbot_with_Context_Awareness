@@ -4,55 +4,71 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
-# 1. Setup & Security
+# --- 1. PAGE CONFIGURATION ---
+st.set_page_config(page_title="AI Squad Hub", page_icon="🤖", layout="centered")
+
+# Custom CSS for a cleaner look
+st.markdown("""
+    <style>
+    .stChatMessage { border-radius: 15px; margin-bottom: 10px; }
+    .stChatInputContainer { padding-bottom: 20px; }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- 2. SETUP & SECURITY ---
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
 
-# 2. Initialize the Agents
+# Check if API key exists
+if not api_key:
+    st.error("❌ GOOGLE_API_KEY not found! Please check your .env file.")
+    st.stop()
+
+# Initialize the Agents
 researcher = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
 writer = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
 
-# 3. Initialize Memory
+# --- 3. SIDEBAR SETTINGS ---
+with st.sidebar:
+    st.title("🤖 AI Squad Settings")
+    st.markdown("---")
+    st.info("**Researcher:** Gathers facts\n\n**Writer:** Polishes the final response")
+    if st.button("Clear Chat History"):
+        st.session_state.chat_history = []
+        st.rerun()
+
+# --- 4. CHAT HISTORY LOGIC ---
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# 4. Chat Logic
-if user_input := st.chat_input("Ask your squad anything..."):
-    # Show user message
+# Display previous messages
+for message in st.session_state.chat_history:
+    role = "user" if isinstance(message, HumanMessage) else "assistant"
+    with st.chat_message(role):
+        st.markdown(message.content)
+
+# --- 5. CHAT INPUT & SQUAD LOGIC ---
+if user_query := st.chat_input("What should the squad work on?"):
+    # Display user message
     with st.chat_message("user"):
-        st.markdown(user_input)
-    
-    # Add to history
-    st.session_state.chat_history.append(HumanMessage(content=user_input))
+        st.markdown(user_query)
+    st.session_state.chat_history.append(HumanMessage(content=user_query))
 
+    # AI Process
     with st.chat_message("assistant"):
-        with st.spinner("The Squad is thinking..."):
-            # Prepare context for the agents
-            context = st.session_state.chat_history[-5:] # Last 5 messages for memory
-
-            # Agent 1: Researcher (Gathers facts)
-            research_query = [
-                SystemMessage(content="You are the Researcher. Find key facts and details."),
-                *context
-            ]
-            raw_facts = researcher.invoke(research_query).content
-
-            # Agent 2: Writer (Polishes the answer)
-            writing_query = [
-                SystemMessage(content=f"You are the Writer. Use these facts: {raw_facts}. Be concise."),
-                *context
-            ]
-            final_answer = writer.invoke(writing_query).content
-
-            # Show the final result
-            st.markdown(final_answer)
+        with st.status("🛠️ Squad at work...", expanded=True) as status:
+            # Step 1: Research
+            st.write("🔍 Researcher is gathering data...")
+            research_query = f"Provide detailed facts and context for: {user_query}"
+            facts = researcher.invoke(research_query).content
             
-            # Add final answer to memory
-            st.session_state.chat_history.append(AIMessage(content=final_answer))
-
-# Sidebar Info
-with st.sidebar:
-    st.info("The Researcher finds the facts, and the Writer polishes the answer. Your conversation is remembered!")
-    if st.button("Clear Chat Memory"):
-        st.session_state.chat_history = []
-        st.rerun()
+            # Step 2: Write
+            st.write("✍️ Writer is crafting the response...")
+            writing_prompt = f"Using these facts: {facts}, write a helpful response to the user's request: {user_query}"
+            final_response = writer.invoke(writing_prompt).content
+            
+            status.update(label="✅ Task Complete!", state="complete", expanded=False)
+        
+        # Display Final Result
+        st.markdown(final_response)
+        st.session_state.chat_history.append(AIMessage(content=final_response))
