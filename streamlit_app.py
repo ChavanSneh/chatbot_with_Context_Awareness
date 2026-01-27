@@ -27,15 +27,15 @@ if not api_key:
 # Initialize the Agents
 # Initialize the Agents with Gemini 2.0 Flash
 # This model is faster and smarter for researcher/writer workflows
-researcher = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash", 
-    google_api_key=api_key,
+researcher = ChatGroq(
+    model_name="llama-3.3-70b-versitile", 
+    groq_api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.1  # Low temperature for the researcher to keep facts accurate
 )
 
-writer = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash", 
-    google_api_key=api_key,
+writer = ChatGroq(
+    model_name="llama-3.3-70b-versitile", 
+    groq_api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.7  # Slightly higher temperature for the writer to be creative
 )
 # --- 3. SIDEBAR SETTINGS ---
