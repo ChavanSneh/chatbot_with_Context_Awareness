@@ -2,63 +2,83 @@ import streamlit as st
 import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
-# Load your OpenRouter Key from .env
+# 1. Setup & Security
 load_dotenv()
-api_key = os.getenv("OPENROUTER_API_KEY") # Make sure this matches your .env file!
+api_key = os.getenv("OPENROUTER_API_KEY")
 or_url = "https://openrouter.ai/api/v1"
 
-st.set_page_config(page_title="Multi-Agent Chat", page_icon="🤖")
-st.title("The AI Squad 🤖🤖")
+# Page Config
+st.set_page_config(page_title="The AI Squad", layout="wide")
+st.title("🤖 The AI Squad: Context-Aware Chat")
 
-# 1. Initialize Memory (The Shared State)
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = [
-        SystemMessage(content="You are a collaborative AI team.")
-    ]
-
-# 2. Define your Agents (The Specialists)
-# Agent 1: Fast & Logical (Llama 3)
+# 2. Initialize the Agents (The Squad)
+# Note the commas and max_tokens=500 to keep within credit limits
 researcher = ChatOpenAI(
-    model="meta-llama/llama-3-8b-instruct",
+    model="google/gemini-flash-1.5-exp:free",
     openai_api_key=api_key,
-    openai_api_base=or_url
+    openai_api_base=or_url,
+    max_tokens=500,
 )
 
-# Agent 2: Creative & Sophisticated (Claude 3.5 or GPT-4o)
 writer = ChatOpenAI(
-    model="anthropic/claude-3.5-sonnet", 
+    model="google/gemini-flash-1.5-exp:free",
     openai_api_key=api_key,
-    openai_api_base=or_url
+    openai_api_base=or_url,
+    max_tokens=500,
 )
 
-# 3. Display Chat
+# 3. Initialize Memory (Context Awareness)
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# Display previous chat messages
 for message in st.session_state.chat_history:
-    if isinstance(message, (HumanMessage, AIMessage)):
-        role = "user" if isinstance(message, HumanMessage) else "assistant"
-        with st.chat_message(role):
+    if isinstance(message, HumanMessage):
+        with st.chat_message("user"):
+            st.markdown(message.content)
+    elif isinstance(message, AIMessage):
+        with st.chat_message("assistant"):
             st.markdown(message.content)
 
-# 4. The Multi-Agent Workflow
-if user_query := st.chat_input("Ask your team..."):
-    st.session_state.chat_history.append(HumanMessage(content=user_query))
+# 4. Chat Logic
+if user_input := st.chat_input("Ask your squad anything..."):
+    # Show user message
     with st.chat_message("user"):
-        st.markdown(user_query)
+        st.markdown(user_input)
+    
+    # Add to history
+    st.session_state.chat_history.append(HumanMessage(content=user_input))
 
     with st.chat_message("assistant"):
-        # Step A: Researcher Agent thinks first
-        with st.status("Researcher is thinking...", expanded=False):
-            # Pass full history for Context Awareness
-            research_notes = researcher.invoke(st.session_state.chat_history)
-            st.write("Done researching.")
+        with st.spinner("The Squad is thinking..."):
+            # Prepare context for the agents
+            context = st.session_state.chat_history[-5:] # Last 5 messages for memory
 
-        # Step B: Writer Agent polishes the research
-        with st.status("Writer is crafting response...", expanded=False):
-            # We give the writer the research notes + history
-            final_response = writer.invoke(
-                st.session_state.chat_history + [AIMessage(content=f"Notes: {research_notes.content}")]
-            )
-        
-        st.markdown(final_response.content)
-        st.session_state.chat_history.append(AIMessage(content=final_response.content))
+            # Agent 1: Researcher (Gathers facts)
+            research_query = [
+                SystemMessage(content="You are the Researcher. Find key facts and details."),
+                *context
+            ]
+            raw_facts = researcher.invoke(research_query).content
+
+            # Agent 2: Writer (Polishes the answer)
+            writing_query = [
+                SystemMessage(content=f"You are the Writer. Use these facts: {raw_facts}. Be concise."),
+                *context
+            ]
+            final_answer = writer.invoke(writing_query).content
+
+            # Show the final result
+            st.markdown(final_answer)
+            
+            # Add final answer to memory
+            st.session_state.chat_history.append(AIMessage(content=final_answer))
+
+# Sidebar Info
+with st.sidebar:
+    st.info("The Researcher finds the facts, and the Writer polishes the answer. Your conversation is remembered!")
+    if st.button("Clear Chat Memory"):
+        st.session_state.chat_history = []
+        st.rerun()

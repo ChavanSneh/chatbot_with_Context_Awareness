@@ -1,0 +1,27 @@
+[theme]
+# The primary accent color for buttons and interactive elements
+primaryColor = "#00FFA3" 
+
+# The main background color (A deep midnight blue/black)
+backgroundColor = "#0E1117"
+
+# Background color for the sidebar and chat input box
+secondaryBackgroundColor = "#1E232D"
+
+# Main text color
+textColor = "#FFFFFF"
+
+# Options: "sans serif", "serif", or "monospace"
+font = "sans serif"
+
+[client]
+# Automatically opens the app in "Wide Mode" (better for chat columns)
+layout = "wide"
+
+[browser]
+# Removes the "Gathering usage statistics" message in your terminal
+gatherUsageStats = false
+
+[server]
+# Disables the "Run on save" notification for a cleaner experience
+runOnSave = true
