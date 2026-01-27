@@ -25,19 +25,22 @@ if not api_key:
     st.stop()
 
 # Initialize the Agents
-# Initialize the Agents with Gemini 2.0 Flash
-# This model is faster and smarter for researcher/writer workflows
+from langchain_groq import ChatGroq  # 👈 Make sure this is in your imports!
+
+# Setup the Squad with Groq (Llama 3.3 70B)
+# High speed + High intelligence = Best for Agents
 researcher = ChatGroq(
-    model_name="llama-3.3-70b-versitile", 
+    model_name="llama-3.3-70b-versatile",
     groq_api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.1  # Low temperature for the researcher to keep facts accurate
+    temperature=0.1
 )
 
 writer = ChatGroq(
-    model_name="llama-3.3-70b-versitile", 
+    model_name="llama-3.3-70b-versatile",
     groq_api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.7  # Slightly higher temperature for the writer to be creative
+    temperature=0.7
 )
+
 # --- 3. SIDEBAR SETTINGS ---
 with st.sidebar:
     st.title("🤖 AI Squad Settings")
