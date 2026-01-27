@@ -23,14 +23,16 @@ if "chat_history" not in st.session_state:
 researcher = ChatOpenAI(
     model="meta-llama/llama-3-8b-instruct",
     openai_api_key=api_key,
-    openai_api_base=or_url
+    openai_api_base=or_url,
+    max_tokens=500, #ADD THIS LINE
 )
 
 # Agent 2: Creative & Sophisticated (Claude 3.5 or GPT-4o)
 writer = ChatOpenAI(
     model="anthropic/claude-3.5-sonnet", 
     openai_api_key=api_key,
-    openai_api_base=or_url
+    openai_api_base=or_url,
+    max_tokens=500, #ADD THIS LINE
 )
 
 # 3. Display Chat
