@@ -99,5 +99,4 @@ if user_query := st.chat_input("What should the squad work on?"):
                     status.update(label="✅ Task Complete!", state="complete")
                 
                 # Display Result
-                st.write_stream(final_response)
                 st.session_state.chat_history.append(AIMessage(content=final_response))
