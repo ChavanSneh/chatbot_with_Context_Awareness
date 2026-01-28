@@ -1,4 +1,8 @@
 import streamlit as st
+
+# This is the modern replacement for the old config option
+st.set_page_config(layout="wide") 
+ 
 import os
 from dotenv import load_dotenv
 
