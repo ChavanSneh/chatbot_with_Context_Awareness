@@ -68,8 +68,6 @@ for msg in st.session_state.messages:
 # --- CHAT INPUT ---
 if prompt := st.chat_input("What should the 🏗️ Hybrid Squad investigate?"):
 
-
-
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
