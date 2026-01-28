@@ -1,113 +1,82 @@
 import streamlit as st
-
-from langchain_openai import ChatOpenAI
-
-
-from langchain_groq import ChatGroq
 import os
+from groq import Groq
+import openai
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="OpenRouter Squad", page_icon="🕵️")
-st.title("⚡The Lightning Squad: Gemini & Groq")
+# --- 1. SETUP & PAGE CONFIG ---
+st.set_page_config(page_title="The Lightning Squad", page_icon="⚡")
 
-# Get API Keys
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+# Custom CSS to make it look sharp
+st.markdown("""
+    <style>
+    .main { text-align: center; }
+    .stChatInput { margin-top: 20px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-st.set_page_config(page_title="AI Squad", page_icon="🤖")
-st.title("🤖 AI Research Squad 🤖")
+st.title("⚡ The Lightning Squad")
+st.subheader("High-Speed Research & Creative Writing 🤖")
 
-# Get API Key from environment
+# --- 2. SECRETS LOADING ---
+# This pulls from .streamlit/secrets.toml
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+# --- 3. THE SQUAD BRAINS (Prompts) ---
+RESEARCHER_IDENTITY = "You are the Researcher. Find facts and deep context on this topic."
+WRITER_IDENTITY = "You are the Expert Writer. Use the Researcher's data to write a punchy, witty, and helpful response."
 
-# --- AGENT SETUP ---
-def get_agents():
-
-    # RESEARCHER: Gemini 1.5 Flash (via OpenRouter)
-    researcher = ChatOpenAI(
-        model="google/gemini-flash-1.5",
-        openai_api_key=OPENROUTER_API_KEY,
-        base_url="https://openrouter.ai/api/v1",
-        default_headers={
-            "HTTP-Referer": "http://localhost:3000", # Optional: your app URL
-            "X-Title": "AI Squad App",              # Optional: your app name
-        }
-    )
-    
-    # WRITER: Groq (Llama 3.3 Versatile)
-
-    # Researcher: Using the new '8b-instant' model
-    researcher = ChatGroq(model="llama-3.1-8b-instant", groq_api_key=GROQ_API_KEY)
-    
-    # Writer: Using the new '3.3-70b-versatile' model
-
-    writer = ChatGroq(
-        model="llama-3.3-70b-versatile", 
-        groq_api_key=GROQ_API_KEY, 
-        streaming=True
-    )
-    return researcher, writer
-
-
-# Your favorite streaming helper
-
-# Your favorite streaming helper!
-
-def stream_parser(stream):
-    for chunk in stream:
-        yield chunk.content
-
-# --- SESSION STATE ---
+# --- 4. CHAT HISTORY INITIALIZATION ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Display existing chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# --- CHAT INPUT ---
+# --- 5. THE MAIN CHAT INPUT (Only one!) ---
 if prompt := st.chat_input("What should the 🏗️ Hybrid Squad investigate?"):
-
+    
+    # Add user message to UI
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # --- PHASE 1: THE RESEARCHER (via OpenRouter/Gemini) ---
+    with st.status("Researcher is gathering data...", expanded=False) as status:
+        client_or = openai.OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+        )
+        
+        res_response = client_or.chat.completions.create(
+            model="google/gemini-2.0-flash-001",
+            messages=[
+                {"role": "system", "content": RESEARCHER_IDENTITY},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        research_data = res_response.choices[0].message.content
+        status.update(label="Research complete!", state="complete")
+
+    # --- PHASE 2: THE WRITER (via Groq/Llama) ---
     with st.chat_message("assistant"):
+        st.write("Writer (Versatile) is preparing the response...")
+        
+        client_groq = Groq(api_key=GROQ_API_KEY)
+        
+        # We pass the research data to the writer so they have context!
+        writer_response = client_groq.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": WRITER_IDENTITY},
+                {"role": "user", "content": f"Research Data: {research_data}\n\nUser Question: {prompt}"}
+            ]
+        )
+        
+        final_answer = writer_response.choices[0].message.content
+        st.markdown(final_answer)
 
-        with st.status("🏗️ Hybrid Squad Processing...", expanded=True) as status:
-            agent_r, agent_w = get_agents()
-            
-            # Step 1: Gemini (OpenRouter) Research
-            st.write("🛰️ Gemini is scanning for facts...")
-            facts = agent_r.invoke(prompt).content
-            
-            st.write("✍️ Groq (Versatile) is drafting the report...")
-            
-            # Step 2: Groq Writing (Streaming)
-            response_stream = agent_w.stream(f"Research: {facts}\n\nQuestion: {prompt}")
-            
-            # This is the "ChatGPT feeling" you wanted:
-
-        with st.status("🔍 Squad is investigating...", expanded=True) as status:
-            agent_r, agent_w = get_agents()
-            
-            # Step 1: Research
-            st.write("Researcher is gathering data...")
-            facts = agent_r.invoke(prompt).content
-            
-            st.write("Writer (Versatile) is preparing the response...")
-            
-            # Step 2: Write with the ChatGPT feeling
-            response_stream = agent_w.stream(f"Research: {facts}\n\nUser Question: {prompt}")
-            
-            # This is exactly the logic you wanted:
-
-            final_response = st.write_stream(stream_parser(response_stream))
-            
-            status.update(label="✅ Task Complete!", state="complete")
-
-
-    st.session_state.messages.append({"role": "assistant", "content": final_response})
-
-    st.session_state.messages.append({"role": "assistant", "content": final_response})
-
+    # Save the assistant's response
+    st.session_state.messages.append({"role": "assistant", "content": final_answer})
