@@ -14,7 +14,7 @@ st.title("⚡The Lightning Squad: Gemini & Groq")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
 st.set_page_config(page_title="AI Squad", page_icon="🤖")
-st.title("🤖 AI Research Squad")
+st.title("🤖 AI Research Squad 🤖")
 
 # Get API Key from environment
 
@@ -68,7 +68,7 @@ for msg in st.session_state.messages:
 # --- CHAT INPUT ---
 if prompt := st.chat_input("What should the squad investigate?"):
 
-if prompt := st.chat_input("Ask your squad anything..."):
+ if prompt := st.chat_input("Ask your squad anything..."):
 
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
