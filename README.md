@@ -4,16 +4,16 @@ A high-speed, dual-engine chatbot built with **Streamlit**, **Groq**, and **Open
 
 ## 🚀 The Architecture
 The Lightning Squad operates using two distinct AI "Agents":
-1. **The Researcher (Google Gemini 2.0 Flash):** Scans for facts, context, and data.
+1. **The Researcher (Google Gemini 3 Flash):** Scans for facts, context, and data.
 2. **The Writer (Meta Llama 3.3 70B):** Takes the research and crafts a punchy, tactical response.
 
 
 
 ## ✨ Features
-- **Dual-Model Processing:** Combines the reasoning of Gemini with the speed of Groq's Llama-3.
+- **Dual-Model Processing:** Combines Gemini's reasoning with Groq's Llama-3 speed.
 - **Context Awareness:** The writer knows what the researcher found.
-- **Modern UI:** A clean, dark-themed interface built for rapid interaction.
-- **Tactical Persona:** Specialized system prompts that give the bot a unique "Lightning Squad" identity.
+- **Modern UI:** A clean, dark-themed interface.
+- **Tactical Persona:** Specialized system prompts for a unique identity.
 
 ## 🛠️ Setup & Installation
 
