@@ -62,7 +62,7 @@ if prompt := st.chat_input("What should the 🏗️ Hybrid Squad investigate?"):
 
     # --- PHASE 2: THE WRITER (via Groq/Llama) ---
     with st.chat_message("assistant"):
-        st.write("Writer (Versatile) is preparing the response...")
+        st.write("Writer is preparing the response...")
         
         client_groq = Groq(api_key=GROQ_API_KEY)
         
