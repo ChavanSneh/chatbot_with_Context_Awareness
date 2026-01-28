@@ -1,106 +1,61 @@
 import streamlit as st
-
-# This is the modern replacement for the old config option
-st.set_page_config(layout="wide") 
- 
+from langchain_groq import ChatGroq
 import os
-from dotenv import load_dotenv
 
-# --- 1. PAGE CONFIGURATION ---
-st.set_page_config(
-    page_title="AI Squad Hub (Groq Powered)", 
-    page_icon="⚡", 
-    layout="centered"
-)
+# --- PAGE SETUP ---
+st.set_page_config(page_title="AI Squad", page_icon="🤖")
+st.title("🤖 AI Research Squad")
 
-# Custom CSS for a cleaner UI
-st.markdown("""
-    <style>
-    .stChatMessage { border-radius: 15px; margin-bottom: 10px; }
-    .stChatInputContainer { padding-bottom: 20px; }
-    </style>
-""", unsafe_allow_html=True)
+# Get API Key from environment
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# --- 2. SETUP & SECURITY ---
-load_dotenv()
-# Check for key in .env or system environment
-api_key = os.getenv("GROQ_API_KEY")
+# --- AGENT SETUP ---
+def get_agents():
+    # Researcher stays fast and direct
+    researcher = ChatGroq(model="llama3-8b-8192", groq_api_key=GROQ_API_KEY)
+    # Writer uses the big model with streaming enabled for the "ChatGPT feeling"
+    writer = ChatGroq(model="llama3-70b-8192", groq_api_key=GROQ_API_KEY, streaming=True)
+    return researcher, writer
 
-def initialize_squad():
-    """Initializes agents inside a function to prevent circular import errors."""
-    try:
-        from langchain_groq import ChatGroq
-        
-        # Researcher: Low temperature for factual accuracy
-        researcher_bot = ChatGroq(
-            model_name="llama-3.3-70b-versatile",
-            api_key=api_key,
-            temperature=0.1
-        )
-        
-        # Writer: Higher temperature for natural, creative flow
-        writer_bot = ChatGroq(
-            model_name="llama-3.3-70b-versatile",
-            api_key=api_key,
-            temperature=0.7
-        )
-        return researcher_bot, writer_bot
-    except Exception as e:
-        st.error(f"Failed to load AI Agents: {e}")
-        return None, None
+# Helper function to handle the stream chunks
+def stream_parser(stream):
+    for chunk in stream:
+        yield chunk.content
 
-# --- 3. SIDEBAR ---
-with st.sidebar:
-    st.title("⚡ Groq Squad Settings")
-    st.markdown("---")
-    if not api_key:
-        st.error("❌ GROQ_API_KEY is missing!")
-        st.info("Please add it to your .env file like this:\nGROQ_API_KEY=gsk_...")
-    else:
-        st.success("Connected to Groq LPU™")
-    
-    if st.button("Clear Chat History"):
-        st.session_state.chat_history = []
-        st.rerun()
+# --- SESSION STATE ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# --- 4. CHAT HISTORY LOGIC ---
-from langchain_core.messages import HumanMessage, AIMessage
+# Display old messages
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# --- CHAT INPUT ---
+if prompt := st.chat_input("Ask your squad anything..."):
+    # Add user message to history
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-for message in st.session_state.chat_history:
-    role = "user" if isinstance(message, HumanMessage) else "assistant"
-    with st.chat_message(role):
-        st.markdown(message.content)
+    # Assistant Response
+    with st.chat_message("assistant"):
+        with st.status("🔍 Squad is investigating...", expanded=True) as status:
+            agent_r, agent_w = get_agents()
+            
+            # 1. Researcher finds facts (Static)
+            st.write("Researcher is gathering data...")
+            facts = agent_r.invoke(prompt).content
+            
+            st.write("Writer is preparing the response...")
+            
+            # 2. Writer streams the response (The ChatGPT feeling!)
+            response_stream = agent_w.stream(f"Research: {facts}\n\nUser Question: {prompt}")
+            
+            # This line animates the text as it comes in
+            final_response = st.write_stream(stream_parser(response_stream))
+            
+            status.update(label="✅ Task Complete!", state="complete")
 
-# --- 5. MAIN CHAT INPUT ---
-if user_query := st.chat_input("What should the squad work on?"):
-    if not api_key:
-        st.warning("Please provide an API Key in the .env file first.")
-    else:
-        # Display user message
-        with st.chat_message("user"):
-            st.markdown(user_query)
-        st.session_state.chat_history.append(HumanMessage(content=user_query))
-
-        # Get the agents
-        researcher, writer = initialize_squad()
-
-        if researcher and writer:
-            with st.chat_message("assistant"):
-                with st.status("🤖 Squad is working...", expanded=True) as status:
-                    # Step 1: Research
-                    st.write("🔍 Researcher is searching...")
-                    res_query = f"Provide detailed facts and context for: {user_query}"
-                    facts = researcher.invoke(res_query).content
-                    
-                    # Step 2: Write
-                    st.write("✍️ Writer is crafting...")
-                    writing_prompt = f"Using these facts: {facts}, write a helpful response to: {user_query}"
-                    final_response = writer.invoke(writing_prompt).content
-                    
-                    status.update(label="✅ Task Complete!", state="complete")
-                
-                # Display Result
-                st.session_state.chat_history.append(AIMessage(content=final_response))
+    # Save the full final response to history
+    st.session_state.messages.append({"role": "assistant", "content": final_response})
