@@ -1,103 +1,72 @@
 import streamlit as st
+from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 import os
-from dotenv import load_dotenv
 
-# --- 1. PAGE CONFIGURATION ---
-st.set_page_config(
-    page_title="AI Squad Hub (Groq Powered)", 
-    page_icon="⚡", 
-    layout="centered"
-)
+# --- PAGE SETUP ---
+st.set_page_config(page_title="OpenRouter Squad", page_icon="🕵️")
+st.title("⚡The Lightning Squad: Gemini & Groq")
 
-# Custom CSS for a cleaner UI
-st.markdown("""
-    <style>
-    .stChatMessage { border-radius: 15px; margin-bottom: 10px; }
-    .stChatInputContainer { padding-bottom: 20px; }
-    </style>
-""", unsafe_allow_html=True)
+# Get API Keys
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# --- 2. SETUP & SECURITY ---
-load_dotenv()
-# Check for key in .env or system environment
-api_key = os.getenv("GROQ_API_KEY")
-
-def initialize_squad():
-    """Initializes agents inside a function to prevent circular import errors."""
-    try:
-        from langchain_groq import ChatGroq
-        
-        # Researcher: Low temperature for factual accuracy
-        researcher_bot = ChatGroq(
-            model_name="llama-3.3-70b-versatile",
-            api_key=api_key,
-            temperature=0.1
-        )
-        
-        # Writer: Higher temperature for natural, creative flow
-        writer_bot = ChatGroq(
-            model_name="llama-3.3-70b-versatile",
-            api_key=api_key,
-            temperature=0.7
-        )
-        return researcher_bot, writer_bot
-    except Exception as e:
-        st.error(f"Failed to load AI Agents: {e}")
-        return None, None
-
-# --- 3. SIDEBAR ---
-with st.sidebar:
-    st.title("⚡ Groq Squad Settings")
-    st.markdown("---")
-    if not api_key:
-        st.error("❌ GROQ_API_KEY is missing!")
-        st.info("Please add it to your .env file like this:\nGROQ_API_KEY=gsk_...")
-    else:
-        st.success("Connected to Groq LPU™")
+# --- AGENT SETUP ---
+def get_agents():
+    # RESEARCHER: Gemini 1.5 Flash (via OpenRouter)
+    researcher = ChatOpenAI(
+        model="google/gemini-flash-1.5",
+        openai_api_key=OPENROUTER_API_KEY,
+        base_url="https://openrouter.ai/api/v1",
+        default_headers={
+            "HTTP-Referer": "http://localhost:3000", # Optional: your app URL
+            "X-Title": "AI Squad App",              # Optional: your app name
+        }
+    )
     
-    if st.button("Clear Chat History"):
-        st.session_state.chat_history = []
-        st.rerun()
+    # WRITER: Groq (Llama 3.3 Versatile)
+    writer = ChatGroq(
+        model="llama-3.3-70b-versatile", 
+        groq_api_key=GROQ_API_KEY, 
+        streaming=True
+    )
+    return researcher, writer
 
-# --- 4. CHAT HISTORY LOGIC ---
-from langchain_core.messages import HumanMessage, AIMessage
+# Your favorite streaming helper
+def stream_parser(stream):
+    for chunk in stream:
+        yield chunk.content
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# --- SESSION STATE ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-for message in st.session_state.chat_history:
-    role = "user" if isinstance(message, HumanMessage) else "assistant"
-    with st.chat_message(role):
-        st.markdown(message.content)
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-# --- 5. MAIN CHAT INPUT ---
-if user_query := st.chat_input("What should the squad work on?"):
-    if not api_key:
-        st.warning("Please provide an API Key in the .env file first.")
-    else:
-        # Display user message
-        with st.chat_message("user"):
-            st.markdown(user_query)
-        st.session_state.chat_history.append(HumanMessage(content=user_query))
+# --- CHAT INPUT ---
+if prompt := st.chat_input("What should the squad investigate?"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-        # Get the agents
-        researcher, writer = initialize_squad()
+    with st.chat_message("assistant"):
+        with st.status("🏗️ Hybrid Squad Processing...", expanded=True) as status:
+            agent_r, agent_w = get_agents()
+            
+            # Step 1: Gemini (OpenRouter) Research
+            st.write("🛰️ Gemini is scanning for facts...")
+            facts = agent_r.invoke(prompt).content
+            
+            st.write("✍️ Groq (Versatile) is drafting the report...")
+            
+            # Step 2: Groq Writing (Streaming)
+            response_stream = agent_w.stream(f"Research: {facts}\n\nQuestion: {prompt}")
+            
+            # This is the "ChatGPT feeling" you wanted:
+            final_response = st.write_stream(stream_parser(response_stream))
+            
+            status.update(label="✅ Task Complete!", state="complete")
 
-        if researcher and writer:
-            with st.chat_message("assistant"):
-                with st.status("🤖 Squad is working...", expanded=True) as status:
-                    # Step 1: Research
-                    st.write("🔍 Researcher is searching...")
-                    res_query = f"Provide detailed facts and context for: {user_query}"
-                    facts = researcher.invoke(res_query).content
-                    
-                    # Step 2: Write
-                    st.write("✍️ Writer is crafting...")
-                    writing_prompt = f"Using these facts: {facts}, write a helpful response to: {user_query}"
-                    final_response = writer.invoke(writing_prompt).content
-                    
-                    status.update(label="✅ Task Complete!", state="complete")
-                
-                # Display Result
-                st.write_stream(final_response)
-                st.session_state.chat_history.append(AIMessage(content=final_response))
+    st.session_state.messages.append({"role": "assistant", "content": final_response})
